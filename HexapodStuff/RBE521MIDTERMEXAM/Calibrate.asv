@@ -1,0 +1,97 @@
+clc;
+clear all;
+
+% check that configurations are valid
+% configurations = [850,          -600,          0,           150,          550,         -500,           600,        -700,          400,        400,          600,        -400;
+%                   150,           0,            550,        -800,          550,         -500,           400,         400,          650,       -550,          150,        -350;
+%                   150,           400,          500,         150,          150,          350,           275,         370,          500,        600,          720,         800;
+%                   deg2rad(3),    deg2rad(-1),  deg2rad(3),  deg2rad(-4),  deg2rad(2),   deg2rad(-8),   deg2rad(5),  deg2rad(0),   deg2rad(0), deg2rad(-6),  deg2rad(-3), deg2rad(-0.5);
+%                   deg2rad(-5),   deg2rad(0.5), deg2rad(1),  deg2rad(2),   deg2rad(-3),  deg2rad(2),    deg2rad(-2), deg2rad(0.4), deg2rad(0), deg2rad(2),   deg2rad(-7), deg2rad(-5);
+%                   deg2rad(1),    deg2rad(7),   deg2rad(-3), deg2rad(0.1), deg2rad(0.5), deg2rad(-0.4), deg2rad(0),  deg2rad(3),   deg2rad(0), deg2rad(5.5), deg2rad(-2), deg2rad(10)];
+
+% numConfig = 12;
+% measurements = zeros(6,numConfig);
+% for i = 1:numConfig
+%     IK(configurations(:,i))
+%     measurements(:, i) = (RFK(IK(configurations(:,i)), configurations(:,i)));
+% end
+
+% Real Kinematic Parameters
+sReal = [96.6610, 22.2476, -122.4519, -120.6859, 24.7769, 91.3462;
+         81.7602, 125.2511, 36.6453, -34.4565, -125.0489, -80.9866;
+         1.0684, -0.5530,   4.3547,  -4.9014,  -4.8473,   0.2515];
+
+uReal = [305.2599, -55.2814, -244.7954, -252.5755, -53.9678, 302.4266;
+         115.0695, 322.9819, 208.0087, -211.8783, -320.6115, -109.4351;
+         2.6210,   4.2181,   3.9365,   -3.0128,    4.3181,   3.3812];
+
+LMinReal = [604.4299;
+            607.2473;
+            600.4441;
+            605.9031;
+            604.5251;
+            600.0616];
+
+realKinematicParameters = [sReal(:,1)', uReal(:,1)', LMinReal(1,1);
+                           sReal(:,2)', uReal(:,2)', LMinReal(2,1);
+                           sReal(:,3)', uReal(:,3)', LMinReal(3,1);
+                           sReal(:,4)', uReal(:,4)', LMinReal(4,1);
+                           sReal(:,5)', uReal(:,5)', LMinReal(5,1);
+                           sReal(:,6)', uReal(:,6)', LMinReal(6,1)];
+
+% Nominal Kinematic Parameters
+s = [92.1597, 27.055, -119.2146, -119.2146, 27.055,   92.1597;
+     84.4488, 122.037, 37.5882,  -37.5882, -122.037, -84.4488;
+     0,       0,       0,         0,        0,        0];
+
+u = [305.4001, -56.4357, -248.9644,  -248.9644, -56.4357,   305.4001;
+     111.1565,  320.0625, 208.9060,  -208.9060, -320.0625, -111.1565;
+     0,         0,        0,          0,         0,         0];
+
+LMinNominal = [604.8652;
+               604.8652;
+               604.8652;
+               604.8652;
+               604.8652;
+               604.8652];
+
+nominalKinematicParameters = [s(:,1)', u(:,1)', LMinNominal(1,1);
+                              s(:,2)', u(:,2)', LMinNominal(2,1);
+                              s(:,3)', u(:,3)', LMinNominal(3,1);
+                              s(:,4)', u(:,4)', LMinNominal(4,1);
+                              s(:,5)', u(:,5)', LMinNominal(5,1);
+                              s(:,6)', u(:,6)', LMinNominal(6,1)];
+
+options = optimoptions('lsqnonlin');
+options.Display = 'iter-detailed';
+options.Algorithm = 'levenberg-marquardt';
+% options.FiniteDifferenceType = 'central';
+[identifiedKinematicParameters,resnorm,residual,exitflag,output] = lsqnonlin(@CF, nominalKinematicParameters,[],[],options);
+
+disp(nominalKinematicParameters);
+disp(realKinematicParameters);
+disp(identifiedKinematicParameters);
+
+errorBeforeCalibration = zeros(42,1);
+errorAfterCalibration = zeros(42,1);
+
+for i = 0 : 5
+    for j = 1 : 7
+        % eBC(i+1,j) = norm(realKinematicParameters(i+1, j) - nominalKinematicParameters(i+1,j),2);
+        % eAC(i+1,j) = norm(realKinematicParameters(i+1, j) - identifiedKinematicParameters(i+1,j),2);
+        errorBeforeCalibration(i*7 + j) =  norm(realKinematicParameters(i+1, j) - nominalKinematicParameters(i+1,j),2);
+        errorAfterCalibration(i*7 + j) =  norm(realKinematicParameters(i+1, j) - identifiedKinematicParameters(i+1,j),2);
+    end
+end
+% disp(eBC);
+% disp(eAC);
+% disp(errorBeforeCalibration);
+% disp(errorAfterCalibration);
+calibrationData = [errorAfterCalibration, errorBeforeCalibration];                
+figure
+bar3(calibrationData);
+ylabel('Kinematic Parameters')
+zlabel('Error (mm)')
+title('Kinematic Parameter Error Before and After Calibration (Grouped by Leg)')
+legend('Average Temperature', 'Maximum Temperature', 'Minimum Temperature')
+set(gca,'ytick',1:6,'yticklabel',compose('Leg %d',1:6))

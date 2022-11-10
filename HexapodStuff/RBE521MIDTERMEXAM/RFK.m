@@ -1,0 +1,62 @@
+% Real Forward Kinematics (AKA Measurement!)
+function P0 = RFK(Lg, Pinit)
+
+% Real Kinematic Parameters
+sReal = [96.6610, 22.2476, -122.4519, -120.6859, 24.7769, 91.3462;
+         81.7602, 125.2511, 36.6453, -34.4565, -125.0489, -80.9866;
+         1.0684, -0.5530,   4.3547,  -4.9014,  -4.8473,   0.2515];
+
+uReal = [305.2599, -55.2814, -244.7954, -252.5755, -53.9678, 302.4266;
+         115.0695, 322.9819, 208.0087, -211.8783, -320.6115, -109.4351;
+         2.6210,   4.2181,   3.9365,   -3.0128,    4.3181,   3.3812];
+
+P0 = Pinit;
+dl = 1;
+
+while dl > 0.000001
+        a = P0(4);
+        b = P0(5);
+        c = P0(6);
+
+        B = [1, 0,      sin(b);
+             0, cos(a), -sin(a)*cos(b);
+             0, sin(a), cos(a)*cos(b)]; % XYZ
+
+        T = [eye(3)       zeros(3,3)
+             zeros(3,3)   B];
+
+        R1FK = [1, 0,       0;
+                0, cos(a), -sin(a);
+                0, sin(a),  cos(a)];
+
+        R2FK = [cos(b),  0, sin(b);
+                0,       1, 0;
+               -sin(b), 0, cos(b)];
+
+        R3FK = [cos(c), -sin(c), 0;
+                sin(c),  cos(c), 0;
+                0,        0,     1];
+
+        R = R1FK * R2FK * R3FK; % XYZ
+
+        L = zeros(3,6);
+        l = zeros(6,1);
+        n = zeros(3,6);
+        for leg = 1:6
+            L(:,leg) = P0(1:3,1) + (R * sReal(:, leg)) - uReal(:, leg);
+            l(leg, 1) = norm(L(:,leg),2);
+            n(:,leg) = L (:, leg)/l(leg,1);
+        end
+
+        J = [n(:,1)' , cross(R * sReal(:,1), n(:,1))';
+             n(:,2)' , cross(R * sReal(:,2), n(:,2))';
+             n(:,3)' , cross(R * sReal(:,3), n(:,3))';
+             n(:,4)' , cross(R * sReal(:,4), n(:,4))';
+             n(:,5)' , cross(R * sReal(:,5), n(:,5))';
+             n(:,6)' , cross(R * sReal(:,6), n(:,6))'];
+
+        JRP = J * T;
+        Dl = Lg - l;
+        P0 = P0 + pinv(JRP) * Dl;
+        dl = norm(Dl , 2);
+end
